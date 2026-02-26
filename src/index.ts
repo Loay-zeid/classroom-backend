@@ -6,7 +6,7 @@ const PORT = 8000;
 app.use(express.json());
 
 app.get("/", (_req, res) => {
-  res.send({ message: "Classroom backend is running." });
+  res.status(200).send("Classroom backend is running.");
 });
 
 app.listen(PORT, () => {
