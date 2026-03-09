@@ -8,7 +8,20 @@ if (!process.env.DATABASE_URL) {
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
+  ...(shouldEnableSsl()
+    ? { ssl: { rejectUnauthorized: shouldVerifySslCerts() } }
+    : {}),
 });
 
 export const index = drizzle(pool);
+
+function shouldEnableSsl() {
+  const value = process.env.DATABASE_SSL ?? process.env.PG_SSL ?? "";
+  return /^(true|1|yes)$/i.test(value.trim());
+}
+
+function shouldVerifySslCerts() {
+  const value = process.env.DATABASE_SSL_REJECT_UNAUTHORIZED ?? "";
+  if (!value) return true;
+  return !/^(false|0|no)$/i.test(value.trim());
+}
