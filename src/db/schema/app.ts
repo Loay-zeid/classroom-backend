@@ -57,7 +57,7 @@ export const classes = pgTable(
     id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
     subjectId: integer("subjectId")
       .notNull()
-      .references(() => subjects.id, { onDelete: "cascade" }),
+      .references(() => subjects.id, { onDelete: "restrict" }),
     teacherId: text("teacherId")
       .notNull()
       .references(() => user.id, { onDelete: "restrict" }),
@@ -89,7 +89,7 @@ export const enrollments = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     classId: integer("classId")
       .notNull()
-      .references(() => classes.id, { onDelete: "cascade" }),
+      .references(() => classes.id, { onDelete: "restrict" }),
     ...timestamps,
   },
   (table) => ({
