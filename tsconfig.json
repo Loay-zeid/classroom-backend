@@ -28,7 +28,8 @@
     "skipLibCheck": true,
 
     /* Environment types */
-    "types": ["node"]
+    "types": ["node"],
+    "typeRoots": ["./src/types", "./node_modules/@types"]
   },
-  "include": ["src"]
+  "include": ["src", "src/types/**/*.d.ts"]
 }
