@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "tsc && node -e \"const fs=require('fs'); if (fs.existsSync('apminsightnode.json')) fs.copyFileSync('apminsightnode.json','dist/apminsightnode.json');\"",
     "start": "node dist/index.js",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
