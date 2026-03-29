@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
-import { index } from "./db";
-import { demoUsers } from "./db/schema";
+import { index } from "./db/index.js";
+import { demoUsers } from "./db/schema/index.js";
 
 async function main() {
   console.log("Performing CRUD operations...");
