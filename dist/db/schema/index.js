@@ -6,4 +6,5 @@ export const demoUsers = pgTable("demo_users", {
     createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 export * from "./app";
+export * from "./auth";
 //# sourceMappingURL=index.js.map
