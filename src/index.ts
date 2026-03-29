@@ -2,10 +2,13 @@ import "apminsight";
 import "dotenv/config";
 import express from "express";
 import subjectsRouter from "./routes/subjects.js";
+import usersRouter from "./routes/users.js";
+import classesRouter from "./routes/classes.js";
 import cors from "cors";
 import securityMiddleware from "./middleware/security.js";
 import {toNodeHandler} from "better-auth/node";
 import {auth} from "./lib/auth.js";
+
 
 const app = express();
 const PORT = 8000;
@@ -24,6 +27,8 @@ app.use(express.json());
 app.use(securityMiddleware);
   // @ts-ignore
 app.use('/api/subjects',subjectsRouter );
+app.use('/api/users', usersRouter);
+app.use('/api/classes',classesRouter)
 
 app.get("/", (_req, res) => {
   res.status(200).send("Classroom backend is running.");
