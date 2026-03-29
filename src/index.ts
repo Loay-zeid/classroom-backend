@@ -2,7 +2,7 @@ import AgentAPI from "apminsight";
 AgentAPI.config()
 import "dotenv/config";
 import express from "express";
-import subjectsRouter from "./routes/subjects";
+import subjectsRouter from "./routes/subjects.js";
 import cors from "cors";
 import security from "./middleware/security";
 import securityMiddleware from "./middleware/security";
