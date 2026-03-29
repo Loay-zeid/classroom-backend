@@ -33,14 +33,22 @@ try {
             max:limit,
         })
     )
+     const ip = req.ip ?? req.socket.remoteAddress ?? "127.0.0.1";
      const arcjetRequest: ArcjetNodeRequest = {
         headers: req.headers,
          method: req.method,
          url:req.originalUrl,
-         socket : {remoteAddress:req.socket.remoteAddress ?? req.ip ?? '0.0.0.0'},
+         socket : {remoteAddress: ip},
      }
 
      const decision = await client.protect(arcjetRequest);
+     if (process.env.ARCJET_ENV === "development") {
+         console.log("Arcjet decision:", {
+             denied: decision.isDenied(),
+             reason: decision.reason?.constructor?.name,
+             message: (decision.reason as { message?: string } | undefined)?.message,
+         });
+     }
 
     if (decision.isDenied() && decision.reason.isBot()){
         return res.status(403).json({
@@ -64,13 +72,15 @@ try {
         return res.status(403).json({
             error: 'Too many requests .', message
         });
-
-
-
-
+    }  if (decision.isDenied() && decision.reason.isError()){
+        console.warn("Arcjet decision error:", decision.reason.message);
+        return res.status(500).json({
+            error: "Arcjet error",
+            message: decision.reason.message,
+        });
     }
 
-next();
+    next();
 }catch (e){
     console.error('Arcjet middleware error:', e);
     res.status(500).json({error: 'Internal error', message: 'Something went wrong with security middleware'});

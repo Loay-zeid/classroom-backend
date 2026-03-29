@@ -13,7 +13,8 @@ const pool = new Pool({
     : {}),
 });
 
-export const index = drizzle(pool);
+export const db = drizzle(pool);
+export const index = db;
 
 function shouldEnableSsl() {
   const value = process.env.DATABASE_SSL ?? process.env.PG_SSL ?? "";
