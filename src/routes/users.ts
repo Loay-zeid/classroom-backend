@@ -10,8 +10,6 @@ router.get("/", async (req, res) => {
   try {
     const { search, role, page = 1, limit = 10 } = req.query;
     const allowedRoles = roleEnum.enumValues;
-    const isRole = (value: string): value is (typeof allowedRoles)[number] =>
-      allowedRoles.includes(value as (typeof allowedRoles)[number]);
 
     const currentPage = Math.max(1, +page);
     const limitPerPage = Math.max(1, +limit);
@@ -26,7 +24,7 @@ router.get("/", async (req, res) => {
     }
 
     if (typeof role === "string") {
-      if (!isRole(role)) {
+      if (!allowedRoles.includes(role)) {
         res.status(400).json({ error: "Invalid role filter." });
         return;
       }
