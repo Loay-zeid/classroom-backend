@@ -11,7 +11,7 @@ import {auth} from "./lib/auth.js";
 
 
 const app = express();
-const PORT = Number(process.env.PORT ?? 8080) || 8080;
+const PORT = Number(process.env.PORT) || 8000;
 
 const rawOrigins =
   process.env.FRONTEND_URLS ?? process.env.FRONTEND_URL ?? "";
@@ -37,11 +37,6 @@ const corsOptions: CorsOptions = {
   methods: ["GET", "POST", "PUT", "DELETE"],
   credentials: true,
 };
-
-app.use((req, _res, next) => {
-  console.log(`[REQ] ${req.method} ${req.url}`);
-  next();
-});
 
 app.use(cors(corsOptions));
 app.use((req, res, next) => {
