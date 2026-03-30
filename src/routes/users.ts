@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { and, desc, eq, getTableColumns, ilike, or, sql } from "drizzle-orm";
-import { user } from "../db/schema/index.js";
+import { roleEnum, user } from "../db/schema/index.js";
 import { index as db } from "../db/index.js";
 
 const router = Router();
@@ -9,6 +9,7 @@ const router = Router();
 router.get("/", async (req, res) => {
   try {
     const { search, role, page = 1, limit = 10 } = req.query;
+    const allowedRoles = roleEnum.enumValues;
 
     const currentPage = Math.max(1, +page);
     const limitPerPage = Math.max(1, +limit);
@@ -22,8 +23,13 @@ router.get("/", async (req, res) => {
       );
     }
 
-    if (role) {
-      filterConditions.push(eq(user.role, String(role)));
+    if (typeof role === "string") {
+      if (!allowedRoles.includes(role)) {
+        res.status(400).json({ error: "Invalid role filter." });
+        return;
+      }
+
+      filterConditions.push(eq(user.role, role));
     }
 
     const whereConditions =
