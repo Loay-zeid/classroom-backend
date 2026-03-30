@@ -39,9 +39,18 @@ const corsOptions: CorsOptions = {
 };
 
 app.use(cors(corsOptions));
-app.options(/.*/, cors(corsOptions));
+app.use((req, res, next) => {
+  if (req.method === "OPTIONS") {
+    return cors(corsOptions)(req, res, () => res.sendStatus(204));
+  }
+  next();
+});
 
 app.all('/api/auth/*splat', toNodeHandler(auth));
+
+app.get("/healthz", (_req, res) => {
+  res.status(200).json({ status: "ok" });
+});
 
 app.use(express.json());
 app.use(securityMiddleware);
