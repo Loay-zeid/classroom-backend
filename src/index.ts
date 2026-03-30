@@ -38,8 +38,9 @@ const corsOptions: CorsOptions = {
   credentials: true,
 };
 
-app.use(cors(corsOptions));
-app.options("*", cors(corsOptions));
+app.use(
+  cors(corsOptions)
+);
 
 app.all('/api/auth/*splat', toNodeHandler(auth));
 
@@ -54,6 +55,6 @@ app.get("/", (_req, res) => {
   res.status(200).send("Classroom backend is running.");
 });
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server running at http://0.0.0.0:${PORT}`);
+app.listen(PORT, () => {
+  console.log(`Server running at http://localhost:${PORT}`);
 });
