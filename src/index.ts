@@ -13,7 +13,11 @@ import {auth} from "./lib/auth.js";
 const app = express();
 const PORT = Number(process.env.PORT) || 8080;
 
-const allowedOriginPatterns = [/\.vercel\.app$/, /^https:\/\/classroom-frontend/];
+const allowedOriginPatterns = [
+  /\.vercel\.app$/,
+  /^https:\/\/classroom-frontend/,
+  /^http:\/\/localhost:\d+$/,
+];
 
 const corsOptions: CorsOptions = {
   origin: (origin, callback) => {
