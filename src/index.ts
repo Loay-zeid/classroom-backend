@@ -13,28 +13,19 @@ import {auth} from "./lib/auth.js";
 const app = express();
 const PORT = Number(process.env.PORT) || 8080;
 
-const rawOrigins =
-  process.env.FRONTEND_URLS ?? process.env.FRONTEND_URL ?? "";
-const allowedOrigins = rawOrigins
-  .split(",")
-  .map((origin) => origin.trim())
-  .filter(Boolean);
+const allowedOriginPatterns = [/\.vercel\.app$/, /^https:\/\/classroom-frontend/];
 
 const corsOptions: CorsOptions = {
   origin: (origin, callback) => {
-    if (!origin) {
-      callback(null, true);
-      return;
-    }
-
-    if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+    if (!origin || allowedOriginPatterns.some((pattern) => pattern.test(origin))) {
       callback(null, true);
       return;
     }
 
     callback(new Error(`CORS not allowed for origin: ${origin}`));
   },
-  methods: ["GET", "POST", "PUT", "DELETE"],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true,
 };
 
