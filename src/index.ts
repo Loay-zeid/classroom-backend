@@ -11,7 +11,7 @@ import {auth} from "./lib/auth.js";
 
 
 const app = express();
-const PORT = Number(process.env.PORT) || 8000;
+const PORT = process.env.PORT || 8080;
 
 const rawOrigins =
   process.env.FRONTEND_URLS ?? process.env.FRONTEND_URL ?? "";
@@ -55,6 +55,6 @@ app.get("/", (_req, res) => {
   res.status(200).send("Classroom backend is running.");
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server running on port ${PORT}`);
 });
