@@ -11,7 +11,7 @@ import {auth} from "./lib/auth.js";
 
 
 const app = express();
-const PORT = process.env.PORT || 8080;
+const PORT = Number(process.env.PORT) || 8080;
 
 const rawOrigins =
   process.env.FRONTEND_URLS ?? process.env.FRONTEND_URL ?? "";
