@@ -49,13 +49,19 @@ router.get("/", async (req, res) => {
     const sortField = typeof sortBy === "string" ? sortBy : "createdAt";
     const sortDirection = order === "asc" ? asc : desc;
 
-    const sortColumnMap: Record<string, any> = {
+    type SubjectSortColumn =
+      | typeof subjects.name
+      | typeof subjects.created_at
+      | typeof departments.name;
+
+    const sortColumnMap: Record<string, SubjectSortColumn> = {
       name: subjects.name,
       createdAt: subjects.created_at,
       department: departments.name,
     };
 
-    const orderByColumn = sortColumnMap[sortField] ?? subjects.created_at;
+    const orderByColumn: SubjectSortColumn =
+      sortColumnMap[sortField] ?? subjects.created_at;
 
     const subjectsList = await db
       .select({

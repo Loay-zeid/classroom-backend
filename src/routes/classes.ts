@@ -55,14 +55,21 @@ router.get("/", async (req, res) => {
     const sortField = typeof sortBy === "string" ? sortBy : "createdAt";
     const sortDirection = order === "asc" ? asc : desc;
 
-    const sortColumnMap: Record<string, any> = {
+    type ClassSortColumn =
+      | typeof classes.name
+      | typeof classes.status
+      | typeof classes.capacity
+      | typeof classes.created_at;
+
+    const sortColumnMap: Record<string, ClassSortColumn> = {
       name: classes.name,
       status: classes.status,
       capacity: classes.capacity,
       createdAt: classes.created_at,
     };
 
-    const orderByColumn = sortColumnMap[sortField] ?? classes.created_at;
+    const orderByColumn: ClassSortColumn =
+      sortColumnMap[sortField] ?? classes.created_at;
 
     const classesList = await db
       .select({

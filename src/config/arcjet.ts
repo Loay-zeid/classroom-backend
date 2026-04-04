@@ -9,25 +9,27 @@ const isDev =
     process.env.NODE_ENV !== "production" ||
     process.env.ARCJET_ENV === "development";
 
+const rules = isDev
+    ? []
+    : [
+        ...shield({ mode: "LIVE" }),
+        ...detectBot({
+            mode: "LIVE",
+            allow: [
+                "CATEGORY:SEARCH_ENGINE",
+                "CATEGORY:PREVIEW",
+            ],
+        }),
+        ...slidingWindow({
+            mode : 'LIVE',
+            interval: '2s',
+            max: 5,
+        }),
+    ];
+
 const aj = arcjet({
     key: process.env.ARCJET_KEY!,
-    rules: isDev
-        ? []
-        : [
-            shield({ mode: "LIVE" }),
-            detectBot({
-                mode: "LIVE",
-                allow: [
-                    "CATEGORY:SEARCH_ENGINE",
-                    "CATEGORY:PREVIEW",
-                ],
-            }),
-            slidingWindow({
-                mode : 'LIVE',
-                interval: '2s',
-                max: 5,
-            }),
-        ],
+    rules,
 });
 
 export default aj;

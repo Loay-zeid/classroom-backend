@@ -48,7 +48,14 @@ router.get("/", async (req, res) => {
     const sortField = typeof sortBy === "string" ? sortBy : "createdAt";
     const sortDirection = order === "asc" ? asc : desc;
 
-    const sortColumnMap: Record<string, typeof user.createdAt> = {
+    type UserSortColumn =
+      | typeof user.id
+      | typeof user.name
+      | typeof user.email
+      | typeof user.role
+      | typeof user.createdAt;
+
+    const sortColumnMap: Record<string, UserSortColumn> = {
       id: user.id,
       name: user.name,
       email: user.email,
@@ -56,7 +63,8 @@ router.get("/", async (req, res) => {
       createdAt: user.createdAt,
     };
 
-    const orderByColumn = sortColumnMap[sortField] ?? user.createdAt;
+    const orderByColumn: UserSortColumn =
+      sortColumnMap[sortField] ?? user.createdAt;
 
     const usersList = await db
       .select({
@@ -87,6 +95,10 @@ router.get("/", async (req, res) => {
 router.get("/:id", async (req, res) => {
   try {
     const { id } = req.params;
+
+    if (!id) {
+      return res.status(400).json({ error: "User ID is required." });
+    }
 
     const [userDetails] = await db
       .select({
@@ -165,6 +177,9 @@ router.post("/", async (req, res) => {
 const updateUser = async (req: import("express").Request, res: import("express").Response) => {
   try {
     const { id } = req.params;
+    if (!id) {
+      return res.status(400).json({ error: "User ID is required." });
+    }
     const { name, email, role } = req.body as {
       name?: string;
       email?: string;
@@ -209,6 +224,9 @@ router.patch("/:id", updateUser);
 router.delete("/:id", async (req, res) => {
   try {
     const { id } = req.params;
+    if (!id) {
+      return res.status(400).json({ error: "User ID is required." });
+    }
 
     const [deletedUser] = await db
       .delete(user)
