@@ -379,6 +379,9 @@ const updateClass = async (
       });
     }
 
+    const normalizedStatus: "active" | "inactive" | "archived" =
+      status === "inactive" || status === "archived" ? status : "active";
+
     const [updatedClass] = await db
       .update(classes)
       .set({
@@ -386,7 +389,7 @@ const updateClass = async (
         subjectId,
         teacherId,
         capacity,
-        status: status ?? "active",
+        status: normalizedStatus,
         description: description ?? "",
         bannerUrl: bannerUrl ?? null,
         bannerCldPubId: bannerCldPubId ?? null,
