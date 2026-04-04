@@ -1,17 +1,18 @@
 import { Router } from "express";
-import { and, desc, eq, getTableColumns, ilike, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, getTableColumns, ilike, or, sql } from "drizzle-orm";
+import { randomUUID } from "crypto";
 import { roleEnum, user } from "../db/schema/index.js";
 import { index as db } from "../db/index.js";
 
 const router = Router();
+const allowedRoles = roleEnum.enumValues;
+const isRole = (value: string): value is (typeof allowedRoles)[number] =>
+  allowedRoles.includes(value as (typeof allowedRoles)[number]);
 
 // get all users with optional search filtering and pagination
 router.get("/", async (req, res) => {
   try {
-    const { search, role, page = 1, limit = 10 } = req.query;
-    const allowedRoles = roleEnum.enumValues;
-    const isRole = (value: string): value is (typeof allowedRoles)[number] =>
-      allowedRoles.includes(value as (typeof allowedRoles)[number]);
+    const { search, role, sortBy, order, page = 1, limit = 10 } = req.query;
 
     const currentPage = Math.max(1, +page);
     const limitPerPage = Math.max(1, +limit);
@@ -44,13 +45,26 @@ router.get("/", async (req, res) => {
 
     const totalCount = countResult[0]?.count ?? 0;
 
+    const sortField = typeof sortBy === "string" ? sortBy : "createdAt";
+    const sortDirection = order === "asc" ? asc : desc;
+
+    const sortColumnMap: Record<string, typeof user.createdAt> = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      createdAt: user.createdAt,
+    };
+
+    const orderByColumn = sortColumnMap[sortField] ?? user.createdAt;
+
     const usersList = await db
       .select({
         ...getTableColumns(user),
       })
       .from(user)
       .where(whereConditions)
-      .orderBy(desc(user.createdAt))
+      .orderBy(sortDirection(orderByColumn))
       .limit(limitPerPage)
       .offset(offset);
 
@@ -66,6 +80,149 @@ router.get("/", async (req, res) => {
   } catch (e) {
     console.error(`Get/users error: ${e}`);
     res.status(500).json({ error: "Failed to get users." });
+  }
+});
+
+// get single user
+router.get("/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [userDetails] = await db
+      .select({
+        ...getTableColumns(user),
+      })
+      .from(user)
+      .where(eq(user.id, id));
+
+    if (!userDetails) {
+      return res.status(404).json({ error: "No user found" });
+    }
+
+    res.status(200).json({ data: userDetails });
+  } catch (e) {
+    console.error(`Get/users/:id error: ${e}`);
+    res.status(500).json({ error: "Failed to get user." });
+  }
+});
+
+// create user
+router.post("/", async (req, res) => {
+  try {
+    const { id, name, email, role } = req.body as {
+      id?: string;
+      name?: string;
+      email?: string;
+      role?: string;
+    };
+
+    if (!name || !email) {
+      return res.status(400).json({ error: "Name and email are required." });
+    }
+
+    if (typeof role === "string" && !isRole(role)) {
+      return res.status(400).json({ error: "Invalid role." });
+    }
+
+    const [createdUser] = await db
+      .insert(user)
+      .values({
+        id: id?.trim() ? id.trim() : randomUUID(),
+        name,
+        email,
+        role: (role as (typeof allowedRoles)[number]) ?? "student",
+        emailVerified: false,
+      })
+      .returning({ id: user.id });
+
+    if (!createdUser) throw new Error("Failed to create user.");
+
+    res.status(201).json({ data: createdUser });
+  } catch (e) {
+    console.error("POST /users error:", e);
+    const error = e as {
+      message?: string;
+      code?: string;
+      detail?: string;
+      constraint?: string;
+      table?: string;
+      column?: string;
+    };
+    res.status(500).json({
+      error: "Failed to create user.",
+      db: {
+        message: error?.message,
+        code: error?.code,
+        detail: error?.detail,
+        constraint: error?.constraint,
+        table: error?.table,
+        column: error?.column,
+      },
+    });
+  }
+});
+
+const updateUser = async (req: import("express").Request, res: import("express").Response) => {
+  try {
+    const { id } = req.params;
+    const { name, email, role } = req.body as {
+      name?: string;
+      email?: string;
+      role?: string;
+    };
+
+    if (typeof role === "string" && !isRole(role)) {
+      return res.status(400).json({ error: "Invalid role." });
+    }
+
+    const updateValues: Partial<typeof user.$inferInsert> = {};
+    if (name) updateValues.name = name;
+    if (email) updateValues.email = email;
+    if (role) updateValues.role = role as (typeof allowedRoles)[number];
+
+    if (Object.keys(updateValues).length === 0) {
+      return res.status(400).json({ error: "No fields to update." });
+    }
+
+    const [updatedUser] = await db
+      .update(user)
+      .set(updateValues)
+      .where(eq(user.id, id))
+      .returning({ id: user.id });
+
+    if (!updatedUser) {
+      return res.status(404).json({ error: "No user found" });
+    }
+
+    res.status(200).json({ data: updatedUser });
+  } catch (e) {
+    console.error(`Update /users/:id error: ${e}`);
+    res.status(500).json({ error: "Failed to update user." });
+  }
+};
+
+// update user
+router.put("/:id", updateUser);
+router.patch("/:id", updateUser);
+
+// delete user
+router.delete("/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [deletedUser] = await db
+      .delete(user)
+      .where(eq(user.id, id))
+      .returning({ id: user.id });
+
+    if (!deletedUser) {
+      return res.status(404).json({ error: "No user found" });
+    }
+
+    res.status(200).json({ data: deletedUser });
+  } catch (e) {
+    console.error(`DELETE /users/:id error: ${e}`);
+    res.status(500).json({ error: "Failed to delete user." });
   }
 });
 
