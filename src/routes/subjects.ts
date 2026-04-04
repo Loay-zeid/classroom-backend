@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { and, asc, desc, eq, getTableColumns, ilike, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, getTableColumns, ilike, or, sql, type SQLWrapper } from "drizzle-orm";
 import { departments, subjects } from "../db/schema/index.js";
 import { index as db } from "../db/index.js";
 
@@ -49,18 +49,13 @@ router.get("/", async (req, res) => {
     const sortField = typeof sortBy === "string" ? sortBy : "createdAt";
     const sortDirection = order === "asc" ? asc : desc;
 
-    type SubjectSortColumn =
-      | typeof subjects.name
-      | typeof subjects.created_at
-      | typeof departments.name;
-
-    const sortColumnMap: Record<string, SubjectSortColumn> = {
+    const sortColumnMap: Record<string, SQLWrapper> = {
       name: subjects.name,
       createdAt: subjects.created_at,
       department: departments.name,
     };
 
-    const orderByColumn: SubjectSortColumn =
+    const orderByColumn: SQLWrapper =
       sortColumnMap[sortField] ?? subjects.created_at;
 
     const subjectsList = await db

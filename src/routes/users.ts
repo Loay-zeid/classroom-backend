@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { and, asc, desc, eq, getTableColumns, ilike, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, getTableColumns, ilike, or, sql, type SQLWrapper } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { roleEnum, user } from "../db/schema/index.js";
 import { index as db } from "../db/index.js";
@@ -48,14 +48,7 @@ router.get("/", async (req, res) => {
     const sortField = typeof sortBy === "string" ? sortBy : "createdAt";
     const sortDirection = order === "asc" ? asc : desc;
 
-    type UserSortColumn =
-      | typeof user.id
-      | typeof user.name
-      | typeof user.email
-      | typeof user.role
-      | typeof user.createdAt;
-
-    const sortColumnMap: Record<string, UserSortColumn> = {
+    const sortColumnMap: Record<string, SQLWrapper> = {
       id: user.id,
       name: user.name,
       email: user.email,
@@ -63,7 +56,7 @@ router.get("/", async (req, res) => {
       createdAt: user.createdAt,
     };
 
-    const orderByColumn: UserSortColumn =
+    const orderByColumn: SQLWrapper =
       sortColumnMap[sortField] ?? user.createdAt;
 
     const usersList = await db
@@ -99,13 +92,14 @@ router.get("/:id", async (req, res) => {
     if (!id) {
       return res.status(400).json({ error: "User ID is required." });
     }
+    const userId = String(id);
 
     const [userDetails] = await db
       .select({
         ...getTableColumns(user),
       })
       .from(user)
-      .where(eq(user.id, id));
+      .where(eq(user.id, userId));
 
     if (!userDetails) {
       return res.status(404).json({ error: "No user found" });
@@ -180,6 +174,7 @@ const updateUser = async (req: import("express").Request, res: import("express")
     if (!id) {
       return res.status(400).json({ error: "User ID is required." });
     }
+    const userId = String(id);
     const { name, email, role } = req.body as {
       name?: string;
       email?: string;
@@ -202,7 +197,7 @@ const updateUser = async (req: import("express").Request, res: import("express")
     const [updatedUser] = await db
       .update(user)
       .set(updateValues)
-      .where(eq(user.id, id))
+      .where(eq(user.id, userId))
       .returning({ id: user.id });
 
     if (!updatedUser) {
@@ -227,10 +222,11 @@ router.delete("/:id", async (req, res) => {
     if (!id) {
       return res.status(400).json({ error: "User ID is required." });
     }
+    const userId = String(id);
 
     const [deletedUser] = await db
       .delete(user)
-      .where(eq(user.id, id))
+      .where(eq(user.id, userId))
       .returning({ id: user.id });
 
     if (!deletedUser) {
