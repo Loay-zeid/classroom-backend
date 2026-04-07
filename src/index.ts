@@ -8,6 +8,7 @@ import departmentsRouter from "./routes/departments.js";
 import enrollmentsRouter from "./routes/enrollments.js";
 import cors, { type CorsOptions } from "cors";
 import securityMiddleware from "./middleware/security.js";
+import attachAuthContext from "./middleware/auth-context.js";
 import {toNodeHandler} from "better-auth/node";
 import {auth} from "./lib/auth.js";
 
@@ -42,6 +43,7 @@ app.use(
 app.all('/api/auth/*splat', toNodeHandler(auth));
 
 app.use(express.json());
+app.use(attachAuthContext);
 app.use(securityMiddleware);
   // @ts-ignore
 app.use('/api/subjects',subjectsRouter );

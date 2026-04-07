@@ -2,11 +2,13 @@ import { Router } from "express";
 import { and, desc, eq, getTableColumns, ilike, sql } from "drizzle-orm";
 import { classes, departments, enrollments, subjects } from "../db/schema/index.js";
 import { index as db } from "../db/index.js";
+import { requireAuth, requireRole } from "../middleware/authorize.js";
 
 const router = Router();
 
 // get all departments with subject totals and pagination
 router.get("/", async (req, res) => {
+  if (!requireAuth(req, res)) return;
   try {
     const { search, page = 1, limit = 10 } = req.query;
 
@@ -59,6 +61,7 @@ router.get("/", async (req, res) => {
 
 // get single department
 router.get("/:id", async (req, res) => {
+  if (!requireAuth(req, res)) return;
   try {
     const departmentId = Number(req.params.id);
 
@@ -93,6 +96,7 @@ router.get("/:id", async (req, res) => {
 
 // create department
 router.post("/", async (req, res) => {
+  if (!requireRole(req, res, ["admin"])) return;
   try {
     const { name, code, description } = req.body as {
       name?: string;
@@ -161,6 +165,7 @@ const updateDepartment = async (
   req: import("express").Request,
   res: import("express").Response
 ) => {
+  if (!requireRole(req, res, ["admin"])) return;
   try {
     const departmentId = Number(req.params.id);
     const { name, code, description } = req.body as {
@@ -210,6 +215,7 @@ router.patch("/:id", updateDepartment);
 
 // delete department
 router.delete("/:id", async (req, res) => {
+  if (!requireRole(req, res, ["admin"])) return;
   try {
     const departmentId = Number(req.params.id);
 

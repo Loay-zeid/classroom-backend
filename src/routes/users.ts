@@ -2,7 +2,10 @@ import { Router } from "express";
 import { and, asc, desc, eq, getTableColumns, ilike, or, sql, type SQLWrapper } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { roleEnum, user } from "../db/schema/index.js";
+import { account, session } from "../db/schema/auth.js";
+import { classes } from "../db/schema/app.js";
 import { index as db } from "../db/index.js";
+import { requireAuth, requireRole } from "../middleware/authorize.js";
 
 const router = Router();
 const allowedRoles = roleEnum.enumValues;
@@ -11,6 +14,7 @@ const isRole = (value: string): value is (typeof allowedRoles)[number] =>
 
 // get all users with optional search filtering and pagination
 router.get("/", async (req, res) => {
+  if (!requireRole(req, res, ["admin", "teacher"])) return;
   try {
     const { search, role, sortBy, order, page = 1, limit = 10 } = req.query;
 
@@ -26,7 +30,9 @@ router.get("/", async (req, res) => {
       );
     }
 
-    if (typeof role === "string") {
+    if (req.user?.role === "teacher") {
+      filterConditions.push(eq(user.role, "student"));
+    } else if (typeof role === "string") {
       if (!isRole(role)) {
         res.status(400).json({ error: "Invalid role filter." });
         return;
@@ -86,6 +92,7 @@ router.get("/", async (req, res) => {
 
 // get single user
 router.get("/:id", async (req, res) => {
+  if (!requireAuth(req, res)) return;
   try {
     const { id } = req.params;
 
@@ -105,6 +112,22 @@ router.get("/:id", async (req, res) => {
       return res.status(404).json({ error: "No user found" });
     }
 
+    if (
+      req.user?.role === "student" &&
+      req.user.id &&
+      req.user.id !== userId
+    ) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    if (
+      req.user?.role === "teacher" &&
+      userDetails.role !== "student" &&
+      req.user.id !== userId
+    ) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
     res.status(200).json({ data: userDetails });
   } catch (e) {
     console.error(`Get/users/:id error: ${e}`);
@@ -114,6 +137,7 @@ router.get("/:id", async (req, res) => {
 
 // create user
 router.post("/", async (req, res) => {
+  if (!requireRole(req, res, ["admin"])) return;
   try {
     const { id, name, email, role } = req.body as {
       id?: string;
@@ -169,6 +193,7 @@ router.post("/", async (req, res) => {
 });
 
 const updateUser = async (req: import("express").Request, res: import("express").Response) => {
+  if (!requireRole(req, res, ["admin"])) return;
   try {
     const { id } = req.params;
     if (!id) {
@@ -217,12 +242,37 @@ router.patch("/:id", updateUser);
 
 // delete user
 router.delete("/:id", async (req, res) => {
+  if (!requireRole(req, res, ["admin"])) return;
   try {
     const { id } = req.params;
     if (!id) {
       return res.status(400).json({ error: "User ID is required." });
     }
     const userId = String(id);
+
+    const [targetUser] = await db
+      .select({ id: user.id, role: user.role })
+      .from(user)
+      .where(eq(user.id, userId));
+
+    if (!targetUser) {
+      return res.status(404).json({ error: "No user found" });
+    }
+
+    if (targetUser.role === "teacher") {
+      const [classRow] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(classes)
+        .where(eq(classes.teacherId, userId));
+      if ((classRow?.count ?? 0) > 0) {
+        return res.status(409).json({
+          error: "Cannot delete teacher with assigned classes.",
+        });
+      }
+    }
+
+    await db.delete(session).where(eq(session.userId, userId));
+    await db.delete(account).where(eq(account.userId, userId));
 
     const [deletedUser] = await db
       .delete(user)
@@ -236,6 +286,12 @@ router.delete("/:id", async (req, res) => {
     res.status(200).json({ data: deletedUser });
   } catch (e) {
     console.error(`DELETE /users/:id error: ${e}`);
+    const error = e as { code?: string; detail?: string };
+    if (error?.code === "23503") {
+      return res.status(409).json({
+        error: "Cannot delete user because it is referenced by other records.",
+      });
+    }
     res.status(500).json({ error: "Failed to delete user." });
   }
 });

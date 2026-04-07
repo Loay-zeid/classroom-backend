@@ -2,10 +2,12 @@ import { Router } from "express";
 import { and, asc, desc, eq, getTableColumns, ilike, or, sql, type SQLWrapper } from "drizzle-orm";
 import { departments, subjects } from "../db/schema/index.js";
 import { index as db } from "../db/index.js";
+import { requireAuth, requireRole } from "../middleware/authorize.js";
 
 const router = Router();
 // get all subjects with optional search filtering and pagination
 router.get("/", async (req, res) => {
+  if (!requireAuth(req, res)) return;
   try {
     const { search, department, departmentId, sortBy, order, page = 1, limit = 10 } = req.query;
 
@@ -87,6 +89,7 @@ router.get("/", async (req, res) => {
 
 // get single subject
 router.get("/:id", async (req, res) => {
+  if (!requireAuth(req, res)) return;
   try {
     const subjectId = Number(req.params.id);
 
@@ -116,6 +119,7 @@ router.get("/:id", async (req, res) => {
 
 // create subject
 router.post("/", async (req, res) => {
+  if (!requireRole(req, res, ["admin", "teacher"])) return;
   try {
     const { name, departmentId } = req.body as {
       name?: string;
@@ -167,6 +171,7 @@ const updateSubject = async (
   req: import("express").Request,
   res: import("express").Response
 ) => {
+  if (!requireRole(req, res, ["admin", "teacher"])) return;
   try {
     const subjectId = Number(req.params.id);
     const { name, departmentId } = req.body as {
@@ -207,6 +212,7 @@ router.patch("/:id", updateSubject);
 
 // delete subject
 router.delete("/:id", async (req, res) => {
+  if (!requireRole(req, res, ["admin", "teacher"])) return;
   try {
     const subjectId = Number(req.params.id);
 

@@ -2,11 +2,13 @@ import { Router } from "express";
 import { and, asc, desc, eq, getTableColumns, ilike, or, sql, type SQLWrapper } from "drizzle-orm";
 import { index as db } from "../db/index.js";
 import { classes, departments, enrollments, subjects, user } from "../db/schema/index.js";
+import { isAdmin, isStudent, isTeacher, requireAuth, requireRole } from "../middleware/authorize.js";
 
 const router = Router();
 
 // get all classes with optional search filtering and pagination
 router.get("/", async (req, res) => {
+  if (!requireAuth(req, res)) return;
   try {
     const { search, subject, subjectId, teacher, sortBy, order, page = 1, limit = 10 } = req.query;
 
@@ -161,16 +163,24 @@ const enrollStudent = async (classId: number, studentId: string) => {
 
 // join class via invite code
 router.post("/join", async (req, res) => {
+  if (!requireAuth(req, res)) return;
   try {
     const { inviteCode, studentId } = req.body as {
       inviteCode?: string;
       studentId?: string;
     };
 
-    if (!inviteCode || !studentId) {
+    const resolvedStudentId =
+      isStudent(req) && req.user?.id ? req.user.id : studentId;
+
+    if (!inviteCode || !resolvedStudentId) {
       return res.status(400).json({
         error: "Invite code and student ID are required.",
       });
+    }
+
+    if (isStudent(req) && resolvedStudentId !== req.user?.id) {
+      return res.status(403).json({ error: "Forbidden" });
     }
 
     const [classRow] = await db
@@ -182,7 +192,7 @@ router.post("/join", async (req, res) => {
       return res.status(404).json({ error: "Invalid invite code." });
     }
 
-    const result = await enrollStudent(classRow.id, studentId);
+    const result = await enrollStudent(classRow.id, resolvedStudentId);
     return res.status(result.status).json(result.body);
   } catch (e) {
     console.error("POST /classes/join error:", e);
@@ -192,6 +202,7 @@ router.post("/join", async (req, res) => {
 
 // Get class details with teacher, subject, and department
 router.get("/:id", async (req, res) => {
+  if (!requireAuth(req, res)) return;
   try {
     const classId = Number(req.params.id);
 
@@ -225,11 +236,24 @@ router.get("/:id", async (req, res) => {
 
 // list enrollments for a class
 router.get("/:id/enrollments", async (req, res) => {
+  if (!requireAuth(req, res)) return;
   try {
     const classId = Number(req.params.id);
 
     if (!Number.isFinite(classId)) {
       return res.status(404).json({ error: "No class found" });
+    }
+
+    if (isTeacher(req)) {
+      const [classRow] = await db
+        .select({ teacherId: classes.teacherId })
+        .from(classes)
+        .where(eq(classes.id, classId));
+      if (!classRow || classRow.teacherId !== req.user?.id) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+    } else if (!isAdmin(req)) {
+      return res.status(403).json({ error: "Forbidden" });
     }
 
     const enrollmentList = await db
@@ -251,6 +275,7 @@ router.get("/:id/enrollments", async (req, res) => {
 
 // enroll student in class
 router.post("/:id/enrollments", async (req, res) => {
+  if (!requireRole(req, res, ["admin", "teacher"])) return;
   try {
     const classId = Number(req.params.id);
     const { studentId } = req.body as { studentId?: string };
@@ -263,6 +288,16 @@ router.post("/:id/enrollments", async (req, res) => {
       return res.status(400).json({ error: "Student ID is required." });
     }
 
+    if (isTeacher(req)) {
+      const [classRow] = await db
+        .select({ teacherId: classes.teacherId })
+        .from(classes)
+        .where(eq(classes.id, classId));
+      if (!classRow || classRow.teacherId !== req.user?.id) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+    }
+
     const result = await enrollStudent(classId, studentId);
     return res.status(result.status).json(result.body);
   } catch (e) {
@@ -273,12 +308,23 @@ router.post("/:id/enrollments", async (req, res) => {
 
 // unenroll student from class
 router.delete("/:id/enrollments/:studentId", async (req, res) => {
+  if (!requireRole(req, res, ["admin", "teacher"])) return;
   try {
     const classId = Number(req.params.id);
     const { studentId } = req.params;
 
     if (!Number.isFinite(classId)) {
       return res.status(404).json({ error: "No class found" });
+    }
+
+    if (isTeacher(req)) {
+      const [classRow] = await db
+        .select({ teacherId: classes.teacherId })
+        .from(classes)
+        .where(eq(classes.id, classId));
+      if (!classRow || classRow.teacherId !== req.user?.id) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
     }
 
     const [deletedEnrollment] = await db
@@ -303,11 +349,19 @@ router.delete("/:id/enrollments/:studentId", async (req, res) => {
 });
 
 router.post("/", async (req, res) => {
+  if (!requireRole(req, res, ["admin", "teacher"])) return;
   try {
+    const teacherId =
+      isTeacher(req) && req.user?.id ? req.user.id : req.body?.teacherId;
+    if (!teacherId) {
+      return res.status(400).json({ error: "Teacher is required." });
+    }
+
     const [createdClass] = await db
       .insert(classes)
       .values({
         ...req.body,
+        teacherId,
         inviteCode: Math.random().toString(36).substring(2, 9),
         schedules: req.body?.schedules ?? [],
       })
@@ -344,6 +398,7 @@ const updateClass = async (
   req: import("express").Request,
   res: import("express").Response
 ) => {
+  if (!requireRole(req, res, ["admin", "teacher"])) return;
   try {
     const classId = Number(req.params.id);
 
@@ -373,10 +428,23 @@ const updateClass = async (
       schedules?: unknown;
     };
 
-    if (!name || !subjectId || !teacherId || !capacity) {
+    const resolvedTeacherId =
+      isTeacher(req) && req.user?.id ? req.user.id : teacherId;
+
+    if (!name || !subjectId || !resolvedTeacherId || !capacity) {
       return res.status(400).json({
         error: "Name, subject, teacher, and capacity are required.",
       });
+    }
+
+    if (isTeacher(req)) {
+      const [classRow] = await db
+        .select({ teacherId: classes.teacherId })
+        .from(classes)
+        .where(eq(classes.id, classId));
+      if (!classRow || classRow.teacherId !== req.user?.id) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
     }
 
     const normalizedStatus: "active" | "inactive" | "archived" =
@@ -387,7 +455,7 @@ const updateClass = async (
       .set({
         name: name.trim(),
         subjectId,
-        teacherId,
+        teacherId: resolvedTeacherId,
         capacity,
         status: normalizedStatus,
         description: description ?? "",
@@ -414,11 +482,22 @@ router.patch("/:id", updateClass);
 
 // delete class
 router.delete("/:id", async (req, res) => {
+  if (!requireRole(req, res, ["admin", "teacher"])) return;
   try {
     const classId = Number(req.params.id);
 
     if (!Number.isFinite(classId)) {
       return res.status(404).json({ error: "No class found" });
+    }
+
+    if (isTeacher(req)) {
+      const [classRow] = await db
+        .select({ teacherId: classes.teacherId })
+        .from(classes)
+        .where(eq(classes.id, classId));
+      if (!classRow || classRow.teacherId !== req.user?.id) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
     }
 
     const [deletedClass] = await db

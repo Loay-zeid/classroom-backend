@@ -2,13 +2,21 @@ import { Router } from "express";
 import { and, desc, eq, getTableColumns, ilike, or, sql } from "drizzle-orm";
 import { index as db } from "../db/index.js";
 import { classes, enrollments, user } from "../db/schema/index.js";
+import { isStudent, requireAuth } from "../middleware/authorize.js";
 
 const router = Router();
 
 // get all enrollments with optional search filtering and pagination
 router.get("/", async (req, res) => {
+  if (!requireAuth(req, res)) return;
   try {
     const { search, classId, studentId, page = 1, limit = 10 } = req.query;
+
+    if (isStudent(req)) {
+      if (studentId && String(studentId) !== req.user?.id) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+    }
 
     const currentPage = Math.max(1, +page);
     const limitPerPage = Math.max(1, +limit);
@@ -35,6 +43,8 @@ router.get("/", async (req, res) => {
 
     if (studentId) {
       filterConditions.push(eq(enrollments.studentId, String(studentId)));
+    } else if (isStudent(req) && req.user?.id) {
+      filterConditions.push(eq(enrollments.studentId, req.user.id));
     }
 
     const whereConditions =
