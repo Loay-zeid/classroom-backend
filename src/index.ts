@@ -11,20 +11,15 @@ import securityMiddleware from "./middleware/security.js";
 import attachAuthContext from "./middleware/auth-context.js";
 import {toNodeHandler} from "better-auth/node";
 import {auth} from "./lib/auth.js";
+import { isAllowedOrigin, trustedOrigins } from "./lib/origins.js";
 
 
 const app = express();
 const PORT = Number(process.env.PORT) || 8080;
 
-const allowedOriginPatterns = [
-  /\.vercel\.app$/,
-  /^https:\/\/classroom-frontend/,
-  /^http:\/\/localhost:\d+$/,
-];
-
 const corsOptions: CorsOptions = {
   origin: (origin, callback) => {
-    if (!origin || allowedOriginPatterns.some((pattern) => pattern.test(origin))) {
+    if (isAllowedOrigin(origin)) {
       callback(null, true);
       return;
     }
@@ -57,6 +52,7 @@ app.get("/", (_req, res) => {
 });
 
 console.log("ENV PORT:", process.env.PORT);
+console.log("Trusted frontend origins:", trustedOrigins);
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Server running on port ${PORT}`);
