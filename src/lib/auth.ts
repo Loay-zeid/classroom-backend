@@ -4,9 +4,24 @@ import { db } from "../db/index.js"; // your drizzle instance
 import * as schema from '../db/schema/auth.js'
 import { trustedOrigins } from "./origins.js";
 
+const authBaseUrl =
+    process.env.BETTER_AUTH_URL ??
+    process.env.BACKEND_URL ??
+    (process.env.RAILWAY_PUBLIC_DOMAIN?.trim()
+        ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN.trim()}`
+        : undefined);
+
 export const auth = betterAuth({
     secret: process.env.BETTER_AUTH_SECRET!,
+    baseURL: authBaseUrl,
     trustedOrigins,
+    trustedProxyHeaders: true,
+    advanced: {
+        useSecureCookies: true,
+        defaultCookieAttributes: {
+            sameSite: "none",
+        },
+    },
     database: drizzleAdapter(db, {
         provider: "pg",
         schema,
