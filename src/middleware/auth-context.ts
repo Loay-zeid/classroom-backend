@@ -1,6 +1,11 @@
 import type { NextFunction, Request, Response } from "express";
 import { auth } from "../lib/auth.js";
 
+const isAppRole = (
+  role: string | undefined
+): role is "admin" | "teacher" | "student" =>
+  role === "admin" || role === "teacher" || role === "student";
+
 const buildAuthHeaders = (req: Request) => {
   const headers = new Headers();
   for (const [key, value] of Object.entries(req.headers)) {
@@ -45,12 +50,22 @@ const attachAuthContext = async (
       | null;
 
     if (payload?.user && typeof payload.user === "object") {
-      req.user = {
-        id: payload.user.id,
-        role: payload.user.role as "admin" | "teacher" | "student" | undefined,
-        email: payload.user.email,
-        name: payload.user.name,
-      };
+      const user: NonNullable<Request["user"]> = {};
+
+      if (payload.user.id) {
+        user.id = payload.user.id;
+      }
+      if (isAppRole(payload.user.role)) {
+        user.role = payload.user.role;
+      }
+      if (payload.user.email) {
+        user.email = payload.user.email;
+      }
+      if (payload.user.name) {
+        user.name = payload.user.name;
+      }
+
+      req.user = user;
     }
   } catch (error) {
     console.warn("attachAuthContext failed:", error);
