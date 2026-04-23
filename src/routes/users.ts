@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { and, asc, desc, eq, getTableColumns, ilike, or, sql, type SQLWrapper } from "drizzle-orm";
 import { randomUUID } from "crypto";
-import { roleEnum, user } from "../db/schema/index.js";
+import { approvalStatusEnum, roleEnum, user } from "../db/schema/index.js";
 import { account, session } from "../db/schema/auth.js";
 import { classes } from "../db/schema/app.js";
 import { index as db } from "../db/index.js";
@@ -9,14 +9,20 @@ import { requireAuth, requireRole } from "../middleware/authorize.js";
 
 const router = Router();
 const allowedRoles = roleEnum.enumValues;
+const allowedApprovalStatuses = approvalStatusEnum.enumValues;
 const isRole = (value: string): value is (typeof allowedRoles)[number] =>
   allowedRoles.includes(value as (typeof allowedRoles)[number]);
+const isApprovalStatus = (
+  value: string
+): value is (typeof allowedApprovalStatuses)[number] =>
+  allowedApprovalStatuses.includes(value as (typeof allowedApprovalStatuses)[number]);
 
 // get all users with optional search filtering and pagination
 router.get("/", async (req, res) => {
   if (!requireRole(req, res, ["admin", "teacher"])) return;
   try {
-    const { search, role, sortBy, order, page = 1, limit = 10 } = req.query;
+    const { search, role, approvalStatus, sortBy, order, page = 1, limit = 10 } =
+      req.query;
 
     const currentPage = Math.max(1, +page);
     const limitPerPage = Math.max(1, +limit);
@@ -41,6 +47,15 @@ router.get("/", async (req, res) => {
       filterConditions.push(eq(user.role, role));
     }
 
+    if (typeof approvalStatus === "string") {
+      if (!isApprovalStatus(approvalStatus)) {
+        res.status(400).json({ error: "Invalid approval status filter." });
+        return;
+      }
+
+      filterConditions.push(eq(user.approvalStatus, approvalStatus));
+    }
+
     const whereConditions =
       filterConditions.length > 0 ? and(...filterConditions) : undefined;
 
@@ -59,6 +74,7 @@ router.get("/", async (req, res) => {
       name: user.name,
       email: user.email,
       role: user.role,
+      approvalStatus: user.approvalStatus,
       createdAt: user.createdAt,
     };
 
@@ -204,16 +220,44 @@ const updateUser = async (req: import("express").Request, res: import("express")
       name?: string;
       email?: string;
       role?: string;
+      approvalStatus?: string;
+    };
+    const { approvalStatus } = req.body as {
+      approvalStatus?: string;
     };
 
     if (typeof role === "string" && !isRole(role)) {
       return res.status(400).json({ error: "Invalid role." });
+    }
+    if (typeof approvalStatus === "string" && !isApprovalStatus(approvalStatus)) {
+      return res.status(400).json({ error: "Invalid approval status." });
+    }
+
+    const [targetUser] = await db
+      .select({
+        id: user.id,
+        role: user.role,
+      })
+      .from(user)
+      .where(eq(user.id, userId));
+
+    if (!targetUser) {
+      return res.status(404).json({ error: "No user found" });
     }
 
     const updateValues: Partial<typeof user.$inferInsert> = {};
     if (name) updateValues.name = name;
     if (email) updateValues.email = email;
     if (role) updateValues.role = role as (typeof allowedRoles)[number];
+    if (approvalStatus) {
+      if (targetUser.role !== "teacher") {
+        return res.status(400).json({
+          error: "Approval status can only be changed for teacher accounts.",
+        });
+      }
+      updateValues.approvalStatus =
+        approvalStatus as (typeof allowedApprovalStatuses)[number];
+    }
 
     if (Object.keys(updateValues).length === 0) {
       return res.status(400).json({ error: "No fields to update." });

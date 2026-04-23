@@ -2,9 +2,17 @@ import type { Request, Response } from "express";
 
 export type AppRole = "admin" | "teacher" | "student";
 
+const isTeacherPendingApproval = (req: Request): boolean =>
+  req.user?.role === "teacher" &&
+  (req.user.approvalStatus === "pending" || req.user.approvalStatus === "rejected");
+
 export const requireAuth = (req: Request, res: Response): boolean => {
   if (!req.user?.id) {
     res.status(401).json({ error: "Unauthorized" });
+    return false;
+  }
+  if (isTeacherPendingApproval(req)) {
+    res.status(403).json({ error: "Teacher account approval is required." });
     return false;
   }
   return true;

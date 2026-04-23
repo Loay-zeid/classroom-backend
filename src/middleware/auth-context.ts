@@ -6,6 +6,11 @@ const isAppRole = (
 ): role is "admin" | "teacher" | "student" =>
   role === "admin" || role === "teacher" || role === "student";
 
+const isAppApprovalStatus = (
+  status: string | undefined
+): status is "pending" | "approved" | "rejected" =>
+  status === "pending" || status === "approved" || status === "rejected";
+
 const buildAuthHeaders = (req: Request) => {
   const headers = new Headers();
   for (const [key, value] of Object.entries(req.headers)) {
@@ -46,7 +51,15 @@ const attachAuthContext = async (
     }
 
     const payload = (await response.json().catch(() => null)) as
-      | { user?: { id?: string; role?: string; email?: string; name?: string } }
+      | {
+          user?: {
+            id?: string;
+            role?: string;
+            approvalStatus?: string;
+            email?: string;
+            name?: string;
+          };
+        }
       | null;
 
     if (payload?.user && typeof payload.user === "object") {
@@ -57,6 +70,9 @@ const attachAuthContext = async (
       }
       if (isAppRole(payload.user.role)) {
         user.role = payload.user.role;
+      }
+      if (isAppApprovalStatus(payload.user.approvalStatus)) {
+        user.approvalStatus = payload.user.approvalStatus;
       }
       if (payload.user.email) {
         user.email = payload.user.email;

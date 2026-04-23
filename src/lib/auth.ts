@@ -10,16 +10,19 @@ const authBaseUrl =
     (process.env.RAILWAY_PUBLIC_DOMAIN?.trim()
         ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN.trim()}`
         : undefined);
+const isProduction = process.env.NODE_ENV === "production";
+const resolvedAuthBaseUrl =
+    authBaseUrl ?? `http://localhost:${process.env.PORT ?? "8080"}`;
 
 export const auth = betterAuth({
     secret: process.env.BETTER_AUTH_SECRET!,
-    baseURL: authBaseUrl,
+    baseURL: resolvedAuthBaseUrl,
     trustedOrigins,
     trustedProxyHeaders: true,
     advanced: {
-        useSecureCookies: true,
+        useSecureCookies: isProduction,
         defaultCookieAttributes: {
-            sameSite: "none",
+            sameSite: isProduction ? "none" : "lax",
         },
     },
     database: drizzleAdapter(db, {
@@ -37,11 +40,37 @@ export const auth = betterAuth({
                 default: "student",
                 input : true,
             },
+            approvalStatus: {
+                type: "string",
+                required: false,
+                default: "approved",
+                input: false,
+            },
             imageCldPubId : {
                 type: "string",
                 required: false,
                 input : true,
             }
         }
-    }
+    },
+    databaseHooks: {
+        user: {
+            create: {
+                before: async (incomingUser) => {
+                    const safeRole =
+                        incomingUser.role === "teacher" ? "teacher" : "student";
+                    const approvalStatus =
+                        safeRole === "teacher" ? "pending" : "approved";
+
+                    return {
+                        data: {
+                            ...incomingUser,
+                            role: safeRole,
+                            approvalStatus,
+                        },
+                    };
+                },
+            },
+        },
+    },
 });

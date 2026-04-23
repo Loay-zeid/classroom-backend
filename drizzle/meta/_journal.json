@@ -15,6 +15,13 @@
       "when": 1773014510136,
       "tag": "0001_previous_skaar",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1776466800000,
+      "tag": "0002_teacher_approval_status",
+      "breakpoints": true
     }
   ]
 }

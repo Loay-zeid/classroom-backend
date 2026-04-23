@@ -18,6 +18,11 @@ const timestamps = {
 };
 
 export const roleEnum = pgEnum("role", ["student", "teacher", "admin"]);
+export const approvalStatusEnum = pgEnum("approval_status", [
+    "pending",
+    "approved",
+    "rejected",
+]);
 
 export const user = pgTable(
     "user",
@@ -28,6 +33,9 @@ export const user = pgTable(
         emailVerified: boolean("email_verified").notNull(),
         image: text("image"),
         role: roleEnum("role").notNull().default("student"),
+        approvalStatus: approvalStatusEnum("approval_status")
+            .notNull()
+            .default("approved"),
         imageCldPubId: text("image_cld_pub_id"),
 
         ...timestamps,

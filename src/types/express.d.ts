@@ -5,6 +5,7 @@ declare module "express-serve-static-core" {
         user?: {
             id?: string;
             role?: "admin" | "teacher" | "student";
+            approvalStatus?: "pending" | "approved" | "rejected";
             email?: string;
             name?: string;
         };
